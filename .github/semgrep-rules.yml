@@ -1,0 +1,12 @@
+rules:
+  - id: dart-insecure-tls-bypass
+    pattern-regex: (?i)badCertificateCallback[\s\S]*?return\s+true
+    message: "Insecure TLS/SSL verification bypass detected. Overriding badCertificateCallback to return true allows Man-in-the-Middle (MitM) attacks."
+    languages: [dart]
+    severity: ERROR
+
+  - id: dart-hardcoded-secret
+    pattern-regex: (?i)(key|secret|password|token).{0,20}=\s*['"][^'"]{8,}['"]
+    message: "Potential hardcoded credential or secret detected."
+    languages: [dart]
+    severity: WARNING

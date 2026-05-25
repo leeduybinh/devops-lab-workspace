@@ -1,0 +1,61 @@
+name: Reusable Mobile Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      build_env:
+        description: 'Build Environment (e.g. development, staging, production)'
+        required: false
+        type: string
+        default: 'development'
+
+jobs:
+  security-scans:
+    name: Run Security Scans
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Checkout Codebase
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Perform MobSF Scan
+      - name: Run MobSF Scan
+        uses: MobSF/mobsfscan-action@v1
+        with:
+          args: '. --json --output mobsfscan.json'
+        continue-on-error: true
+
+      # 3. Set up Python for Semgrep CLI
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 4. Install and Run Semgrep
+      - name: Install Semgrep
+        run: |
+          pip install semgrep
+        shell: bash
+
+      - name: Run Semgrep Scan (Targeting Dart/Flutter)
+        run: |
+          # Specifically target the Dart/Flutter source code structure (lib/) using custom rules
+          semgrep scan --config=.github/semgrep-rules.yml --json --output semgrep.json lib/
+        shell: bash
+        continue-on-error: true
+
+      # 5. Upload reports as workflow artifacts for review
+      - name: Upload MobSF Scan Artifact
+        if: always() && hashFiles('mobsfscan.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobsfscan-${{ inputs.build_env }}
+          path: mobsfscan.json
+
+      - name: Upload Semgrep Scan Artifact
+        if: always() && hashFiles('semgrep.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-${{ inputs.build_env }}
+          path: semgrep.json

@@ -1,0 +1,21 @@
+# Local security scan reports
+mobsfscan.json
+semgrep.json
+
+# Flutter/Dart build and tool files
+.venv/
+.semgrep/
+Library/
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store

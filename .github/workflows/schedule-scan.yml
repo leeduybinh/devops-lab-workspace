@@ -1,0 +1,41 @@
+name: Mobile Security Scanning Pipeline
+
+on:
+  # 1. Scheduled cronjob run (every night at 12:00 AM UTC)
+  schedule:
+    - cron: '0 0 * * *'
+  
+  # 2. Trigger on Pull Requests to main
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - 'android/**'
+      - 'ios/**'
+  
+  # 3. Trigger on Releases
+  release:
+    types: [ published ]
+
+  # 4. Manual trigger via GitHub UI for debugging and testing
+  workflow_dispatch:
+    inputs:
+      build_env:
+        description: 'Target Environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+jobs:
+  run-security-scans:
+    name: Call Mobile Scan Reusable Workflow
+    # Calls the local reusable scanning workflow
+    uses: ./.github/workflows/devops-mobile-scan-cronjob.yml
+    with:
+      # Environment configuration (determines artifact naming)
+      build_env: ${{ github.event.inputs.build_env || 'development' }}
