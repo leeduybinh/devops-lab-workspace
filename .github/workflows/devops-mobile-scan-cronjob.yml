@@ -25,22 +25,16 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Install and run scanners
-      - name: Install Scanners
-        run: |
-          pip install mobsfscan semgrep
-        shell: bash
-
       - name: Run MobSF Scan
-        run: |
-          mobsfscan . --json --output mobsfscan.json
-        shell: bash
+        uses: MobSF/mobsfscan@main
+        with:
+          args: '. --json -o mobsfscan.json || true'
         continue-on-error: true
-        
+
       - name: Run Semgrep Scan (Targeting Dart/Flutter)
         run: |
-          semgrep scan --config=.scan-rules/mobile-security.yml --json --output semgrep.json lib/
-        shell: bash
+          pip install semgrep
+          semgrep scan --json --output semgrep.json --config auto
         continue-on-error: true
 
       # 5. Upload reports as workflow artifacts for review
