@@ -32,15 +32,15 @@ jobs:
         shell: bash
 
       - name: Run MobSF Scan
-        uses: MobSF/mobsfscan@main
-        with:
-          args: '. --json -o mobsfscan.json || true'
+        run: |
+          mobsfscan . --json --output mobsfscan.json
+        shell: bash
         continue-on-error: true
-
+        
       - name: Run Semgrep Scan (Targeting Dart/Flutter)
         run: |
-          pip install semgrep
-          semgrep scan --json --output semgrep.json --config auto
+          semgrep scan --config=.scan-rules/mobile-security.yml --json --output semgrep.json lib/
+        shell: bash
         continue-on-error: true
 
       # 5. Upload reports as workflow artifacts for review
