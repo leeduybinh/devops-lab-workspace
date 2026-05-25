@@ -19,24 +19,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Perform MobSF Scan
-      - name: Run MobSF Scan
-        uses: MobSF/mobsfscan-action@v1
-        with:
-          args: '. --json --output mobsfscan.json'
-        continue-on-error: true
-
-      # 3. Set up Python for Semgrep CLI
+      # 2. Set up Python for scanner CLIs
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 4. Install and Run Semgrep
-      - name: Install Semgrep
+      # 3. Install and run scanners
+      - name: Install Scanners
         run: |
-          pip install semgrep
+          pip install mobsfscan semgrep
         shell: bash
+
+      - name: Run MobSF Scan
+        run: |
+          mobsfscan . --json --output mobsfscan.json
+        shell: bash
+        continue-on-error: true
 
       - name: Run Semgrep Scan (Targeting Dart/Flutter)
         run: |
