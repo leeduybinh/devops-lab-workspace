@@ -8,22 +8,83 @@ on:
         required: false
         type: string
         default: 'development'
+      product_name:
+        description: 'Product/application name used for scan context and reporting'
+        required: false
+        type: string
+        default: 'Mobile Application'
+      product_type:
+        description: 'Product type used for scan context and reporting'
+        required: false
+        type: string
+        default: 'Mobile'
+      engagement_name:
+        description: 'Engagement or scan campaign name used for reporting'
+        required: false
+        type: string
+        default: 'Mobile Security Scan'
+      defectdojo_url:
+        description: 'Optional DefectDojo base URL. Leave empty to skip DefectDojo upload.'
+        required: false
+        type: string
+        default: ''
+      devops_elfie_gh_app_id:
+        description: 'Optional GitHub App ID for checkout authentication'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      defectdojo_api_key:
+        description: 'Optional DefectDojo API token'
+        required: false
+      devops_elfie_gh_app_key:
+        description: 'Optional GitHub App private key for checkout authentication'
+        required: false
 
 jobs:
   security-scans:
     name: Run Security Scans
     runs-on: ubuntu-latest
+    env:
+      DEFECTDOJO_API_KEY: ${{ secrets.defectdojo_api_key }}
+      DEVOPS_ELFIE_GH_APP_KEY: ${{ secrets.devops_elfie_gh_app_key }}
     
     steps:
-      # 1. Checkout Codebase
+      # 1. Authenticate with GitHub App when enterprise credentials are provided.
+      - name: Generate GitHub App Token
+        if: ${{ inputs.devops_elfie_gh_app_id != '' && env.DEVOPS_ELFIE_GH_APP_KEY != '' }}
+        id: generate-token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ inputs.devops_elfie_gh_app_id }}
+          private_key: ${{ env.DEVOPS_ELFIE_GH_APP_KEY }}
+
+      # 2. Checkout Codebase
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          token: ${{ steps.generate-token.outputs.token || github.token }}
 
-      # 2. Set up Python for scanner CLIs
+      # 3. Set up Python for scanner CLIs
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Write Scan Context
+        run: |
+          cat > scan-context.json <<EOF
+          {
+            "build_env": "${{ inputs.build_env }}",
+            "product_name": "${{ inputs.product_name }}",
+            "product_type": "${{ inputs.product_type }}",
+            "engagement_name": "${{ inputs.engagement_name }}",
+            "repository": "${{ github.repository }}",
+            "ref": "${{ github.ref_name }}",
+            "sha": "${{ github.sha }}"
+          }
+          EOF
+        shell: bash
 
       - name: Run MobSF Scan
         uses: MobSF/mobsfscan@main
@@ -37,7 +98,61 @@ jobs:
           semgrep scan --json --output semgrep.json --config auto
         continue-on-error: true
 
+      # 4. Optionally upload reports to DefectDojo when URL and token are provided.
+      - name: Upload MobSF Scan to DefectDojo
+        if: ${{ always() && inputs.defectdojo_url != '' && env.DEFECTDOJO_API_KEY != '' && hashFiles('mobsfscan.json') != '' }}
+        run: |
+          curl --fail --show-error --silent --location \
+            --request POST "${DEFECTDOJO_URL%/}/api/v2/import-scan/" \
+            --header "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+            --form "scan_type=MobSFScan" \
+            --form "file=@mobsfscan.json" \
+            --form "product_name=${PRODUCT_NAME}" \
+            --form "product_type_name=${PRODUCT_TYPE}" \
+            --form "engagement_name=${ENGAGEMENT_NAME}" \
+            --form "environment=${BUILD_ENV}" \
+            --form "active=true" \
+            --form "verified=true" \
+            --form "auto_create_context=true"
+        shell: bash
+        env:
+          DEFECTDOJO_URL: ${{ inputs.defectdojo_url }}
+          PRODUCT_NAME: ${{ inputs.product_name }}
+          PRODUCT_TYPE: ${{ inputs.product_type }}
+          ENGAGEMENT_NAME: ${{ inputs.engagement_name }}
+          BUILD_ENV: ${{ inputs.build_env }}
+
+      - name: Upload Semgrep Scan to DefectDojo
+        if: ${{ always() && inputs.defectdojo_url != '' && env.DEFECTDOJO_API_KEY != '' && hashFiles('semgrep.json') != '' }}
+        run: |
+          curl --fail --show-error --silent --location \
+            --request POST "${DEFECTDOJO_URL%/}/api/v2/import-scan/" \
+            --header "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+            --form "scan_type=Semgrep JSON Report" \
+            --form "file=@semgrep.json" \
+            --form "product_name=${PRODUCT_NAME}" \
+            --form "product_type_name=${PRODUCT_TYPE}" \
+            --form "engagement_name=${ENGAGEMENT_NAME}" \
+            --form "environment=${BUILD_ENV}" \
+            --form "active=true" \
+            --form "verified=true" \
+            --form "auto_create_context=true"
+        shell: bash
+        env:
+          DEFECTDOJO_URL: ${{ inputs.defectdojo_url }}
+          PRODUCT_NAME: ${{ inputs.product_name }}
+          PRODUCT_TYPE: ${{ inputs.product_type }}
+          ENGAGEMENT_NAME: ${{ inputs.engagement_name }}
+          BUILD_ENV: ${{ inputs.build_env }}
+
       # 5. Upload reports as workflow artifacts for review
+      - name: Upload Scan Context Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-context-${{ inputs.build_env }}
+          path: scan-context.json
+
       - name: Upload MobSF Scan Artifact
         if: always() && hashFiles('mobsfscan.json') != ''
         uses: actions/upload-artifact@v4

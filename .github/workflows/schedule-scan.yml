@@ -39,3 +39,11 @@ jobs:
     with:
       # Environment configuration (determines artifact naming)
       build_env: ${{ github.event.inputs.build_env || 'development' }}
+      product_name: 'DevOps Mobile Scan Lab'
+      product_type: 'Mobile'
+      engagement_name: 'Security Scan - ${{ github.ref_name || github.head_ref }}'
+      defectdojo_url: ${{ vars.DEFECTDOJO_URL || '' }}
+      devops_elfie_gh_app_id: ${{ vars.DEVOPS_ELFIE_GH_APP_ID || '' }}
+    secrets:
+      defectdojo_api_key: ${{ secrets.DEFECTDOJO_API_KEY }}
+      devops_elfie_gh_app_key: ${{ secrets.DEVOPS_ELFIE_GH_APP_KEY }}
